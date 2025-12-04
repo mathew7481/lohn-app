@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
 # --- ANPASSUNGEN HIER VORNEHMEN ---
-SIGNATUR_HTML_PFAD = '/media/texte/07\ Mitarbeiter/Matthias/Signatur.html'
+SIGNATUR_HTML_PFAD = '/media/texte/07 Mitarbeiter/Matthias/Signatur.html'
 
 SMTP_SERVER = 'mx.niklas-niklas.com'
 SMTP_PORT = 587
