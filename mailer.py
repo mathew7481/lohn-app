@@ -5,17 +5,17 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
 # --- ANPASSUNGEN HIER VORNEHMEN ---
-SIGNATUR_HTML_PFAD = '/pfad/zu/deiner/signatur.html'
+SIGNATUR_HTML_PFAD = '/media/texte/07\ Mitarbeiter/Signatur.html'
 
-SMTP_SERVER = 'smtp.dein-provider.de'
+SMTP_SERVER = 'mx.niklas-niklas.com'
 SMTP_PORT = 587
-SMTP_BENUTZER = 'deine-email@adresse.de'
-SMTP_PASSWORT = 'dein-email-passwort'
+SMTP_BENUTZER = 'matthias.niklas@hv-niklas.com'
+SMTP_PASSWORT = 'M.n1kla5'
 
 DB_CONFIG = {
-    'dbname': 'abrechnungs_db',
-    'user': 'abrechnungs_app',
-    'password': 'dein_password',
+    'dbname': 'gehälter',
+    'user': 'mniklas',
+    'password': 'MPfPOSTGRES2023!',
     'host': 'localhost',
     'port': '5432'
 }
