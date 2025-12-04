@@ -15,9 +15,9 @@ ARCHIV_PFAD = '/media/texte/07 Mitarbeiter/Matthias/HR/Lohn/HV Niklas/Archiv'
 
 # 3. PostgreSQL-Datenbankverbindung
 DB_CONFIG = {
-    'dbname': 'abrechnungs_db',
-    'user': 'abrechnungs_app',
-    'password': 'dein_db_passwort', # BITTE ANPASSEN
+    'dbname': 'gehälter',
+    'user': 'mniklas',
+    'password': 'MPfPOSTGRES2023!', # BITTE ANPASSEN
     'host': 'localhost',
     'port': '5432'
 }
