@@ -285,6 +285,9 @@ def finde_und_speichere_abrechnungen():
                         archivpfad = archiviere_datei(voller_pfad, monat, jahr)
                         if archivpfad:
                             cursor.execute("UPDATE abrechnungen SET archivpfad = %s WHERE id = %s", (archivpfad, neue_id))
+
+                        conn.commit()
+                        print("DB-Transaktion erfolgreich bestätigt.")
                         
                     except psycopg2.IntegrityError:
                         print(f"Info: Diese Abrechnung (ID {mitarbeiter_id}, {monat} {jahr}) existiert bereits in der DB. Archiviere trotzdem.")
