@@ -4,22 +4,28 @@ import shutil
 import PyPDF2
 import psycopg2
 from datetime import datetime
+from config_loader import lade_lokale_umgebungsvariablen
+
+lade_lokale_umgebungsvariablen()
 
 # --- ANPASSUNGEN HIER VORNEHMEN ---
 
-# 1. Der oberste Ordner, in dem die Suche gestartet werden soll.
-ORDNER_PFAD = '/media/texte/07 Mitarbeiter/Matthias/HR/Lohn/HV Niklas'
+# 1. Der aktuelle Arbeitsordner als Basis
+BASIS_PFAD = os.path.abspath(os.getcwd())
 
-# 2. Zentraler Archivordner
-ARCHIV_PFAD = '/media/texte/07 Mitarbeiter/Matthias/HR/Lohn/HV Niklas/Archiv'
+# 2. Der oberste Ordner, in dem die Suche gestartet werden soll.
+ORDNER_PFAD = BASIS_PFAD
 
-# 3. PostgreSQL-Datenbankverbindung
+# 3. Zentraler Archivordner als Unterordner von BASIS_PFAD
+ARCHIV_PFAD = os.path.join(BASIS_PFAD, 'Archiv')
+
+# 4. PostgreSQL-Datenbankverbindung
 DB_CONFIG = {
-    'dbname': 'gehälter',
-    'user': 'mniklas',
-    'password': 'MPfPOSTGRES2023!', # BITTE ANPASSEN
-    'host': 'localhost',
-    'port': '5432'
+    'dbname': os.getenv('DB_NAME', ''),
+    'user': os.getenv('DB_USER', ''),
+    'password': os.getenv('DB_PASSWORD', ''),
+    'host': os.getenv('DB_HOST', ''),
+    'port': os.getenv('DB_PORT', '')
 }
 
 # --- ENDE DER ANPASSUNGEN ---
@@ -89,6 +95,15 @@ def archiviere_datei(quellpfad, monat, jahr):
         return None
 
 def finde_und_speichere_abrechnungen():
+    if not os.path.isdir(ORDNER_PFAD):
+        print(f"KRITISCHER FEHLER: Basis-Ordner existiert nicht oder ist kein Verzeichnis: {ORDNER_PFAD}")
+        return
+
+    fehlende_db_werte = [schluessel for schluessel, wert in DB_CONFIG.items() if not wert]
+    if fehlende_db_werte:
+        print(f"KRITISCHER FEHLER: Fehlende DB-Konfiguration: {', '.join(fehlende_db_werte)}")
+        return
+
     conn = None
     try:
         print("Verbinde mit PostgreSQL-Datenbank...")

@@ -1,26 +1,39 @@
 import smtplib
+import os
 import psycopg2
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+from config_loader import lade_lokale_umgebungsvariablen
+
+lade_lokale_umgebungsvariablen()
+
+
+def lese_int_umgebungsvariable(name, standardwert):
+    wert = os.getenv(name, str(standardwert))
+    try:
+        return int(wert)
+    except ValueError:
+        print(f"Warnung: Ungültiger Wert für {name} ('{wert}'). Verwende {standardwert}.")
+        return standardwert
 
 # --- ANPASSUNGEN HIER VORNEHMEN ---
-SIGNATUR_HTML_PFAD = '/media/texte/07 Mitarbeiter/Matthias/Signatur.html'
+SIGNATUR_HTML_PFAD = os.getenv('SIGNATUR_HTML_PFAD', '')
 
-SMTP_SERVER = 'mx.niklas-niklas.com'
-SMTP_PORT = 587
-SMTP_BENUTZER = 'matthias.niklas@hv-niklas.com'
-SMTP_PASSWORT = 'M.n1kla5'
+SMTP_SERVER = os.getenv('SMTP_SERVER', '')
+SMTP_PORT = lese_int_umgebungsvariable('SMTP_PORT', 587)
+SMTP_BENUTZER = os.getenv('SMTP_BENUTZER', '')
+SMTP_PASSWORT = os.getenv('SMTP_PASSWORT', '')
 
 DB_CONFIG = {
-    'dbname': 'gehälter',
-    'user': 'mniklas',
-    'password': 'MPfPOSTGRES2023!',
-    'host': 'localhost',
-    'port': '5432'
+    'dbname': os.getenv('DB_NAME', ''),
+    'user': os.getenv('DB_USER', ''),
+    'password': os.getenv('DB_PASSWORD', ''),
+    'host': os.getenv('DB_HOST', ''),
+    'port': os.getenv('DB_PORT', '')
 }
 
-EMAIL_BETREFF = 'Ihre Entgeltabrechnung{periode}'
+EMAIL_BETREFF = os.getenv('EMAIL_BETREFF', 'Ihre Entgeltabrechnung{periode}')
 EMAIL_TEXT_FALLBACK = """
 Hallo {name},
 
@@ -48,6 +61,23 @@ def lade_html_signatur():
 
 def sende_neue_abrechnungen():
     """Holt neue Abrechnungen aus der DB, versendet sie und aktualisiert den Status."""
+    fehlende_smtp_werte = []
+    if not SIGNATUR_HTML_PFAD:
+        fehlende_smtp_werte.append('SIGNATUR_HTML_PFAD')
+    if not SMTP_SERVER:
+        fehlende_smtp_werte.append('SMTP_SERVER')
+    if not SMTP_BENUTZER:
+        fehlende_smtp_werte.append('SMTP_BENUTZER')
+    if not SMTP_PASSWORT:
+        fehlende_smtp_werte.append('SMTP_PASSWORT')
+
+    fehlende_db_werte = [schluessel for schluessel, wert in DB_CONFIG.items() if not wert]
+
+    if fehlende_smtp_werte or fehlende_db_werte:
+        fehlend = fehlende_smtp_werte + fehlende_db_werte
+        print(f"KRITISCHER FEHLER: Fehlende Konfiguration: {', '.join(fehlend)}")
+        return
+
     html_signatur = lade_html_signatur()
     if not html_signatur:
         print("Keine Signatur gefunden. Abbruch.")
