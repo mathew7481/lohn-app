@@ -1,6 +1,8 @@
 import os
 import re
 import shutil
+import subprocess
+import time
 import PyPDF2
 import psycopg2
 from datetime import datetime
@@ -27,6 +29,41 @@ DB_CONFIG = {
     'host': os.getenv('DB_HOST', ''),
     'port': os.getenv('DB_PORT', '')
 }
+
+
+def lese_bool_umgebungsvariable(name, standard=False):
+    wert = os.getenv(name, str(standard)).strip().lower()
+    return wert in ('1', 'true', 'ja', 'yes', 'on')
+
+
+def lese_int_umgebungsvariable(name, standard):
+    wert = os.getenv(name, str(standard))
+    try:
+        return int(wert)
+    except ValueError:
+        print(f"Warnung: Ungültiger Wert für {name} ('{wert}'). Verwende {standard}.")
+        return standard
+
+
+def normalisiere_pfad(pfad):
+    if not pfad:
+        return ''
+
+    benutzerprofil = os.getenv('USERPROFILE', '')
+    ersetzt = pfad.replace('$env:USERPROFILE', benutzerprofil)
+    ersetzt = os.path.expandvars(ersetzt)
+    return os.path.expanduser(ersetzt)
+
+
+SSH_TUNNEL_AKTIV = lese_bool_umgebungsvariable('SSH_TUNNEL_AKTIV', False)
+SSH_HOST = os.getenv('SSH_HOST', '')
+SSH_BENUTZER = os.getenv('SSH_BENUTZER', '')
+SSH_KEY_PFAD = normalisiere_pfad(os.getenv('SSH_KEY_PFAD', os.path.join('~', '.ssh', 'id_pguser')))
+SSH_LOCAL_PORT = lese_int_umgebungsvariable('SSH_LOCAL_PORT', 5432)
+SSH_ZIEL_HOST = os.getenv('SSH_ZIEL_HOST', '')
+SSH_ZIEL_PORT = lese_int_umgebungsvariable('SSH_ZIEL_PORT', 5432)
+SSH_SERVER_ALIVE_INTERVAL = lese_int_umgebungsvariable('SSH_SERVER_ALIVE_INTERVAL', 60)
+SSH_SERVER_ALIVE_COUNT_MAX = lese_int_umgebungsvariable('SSH_SERVER_ALIVE_COUNT_MAX', 3)
 
 # --- ENDE DER ANPASSUNGEN ---
 
@@ -94,23 +131,107 @@ def archiviere_datei(quellpfad, monat, jahr):
         print(f"FEHLER beim Archivieren der Datei {quellpfad}: {e}")
         return None
 
+
+def starte_ssh_tunnel():
+    if not SSH_TUNNEL_AKTIV:
+        return None
+
+    fehlende_werte = []
+    if not SSH_HOST:
+        fehlende_werte.append('SSH_HOST')
+    if not SSH_BENUTZER:
+        fehlende_werte.append('SSH_BENUTZER')
+    if not SSH_ZIEL_HOST:
+        fehlende_werte.append('SSH_ZIEL_HOST')
+    if not SSH_KEY_PFAD:
+        fehlende_werte.append('SSH_KEY_PFAD')
+
+    if fehlende_werte:
+        print(f"KRITISCHER FEHLER: Fehlende SSH-Konfiguration: {', '.join(fehlende_werte)}")
+        return None
+
+    if not os.path.exists(SSH_KEY_PFAD):
+        print(f"KRITISCHER FEHLER: SSH-Key wurde nicht gefunden: {SSH_KEY_PFAD}")
+        return None
+
+    befehl = [
+        'ssh',
+        '-N',
+        '-o', f'ServerAliveInterval={SSH_SERVER_ALIVE_INTERVAL}',
+        '-o', f'ServerAliveCountMax={SSH_SERVER_ALIVE_COUNT_MAX}',
+        '-i', SSH_KEY_PFAD,
+        '-L', f'{SSH_LOCAL_PORT}:{SSH_ZIEL_HOST}:{SSH_ZIEL_PORT}',
+        f'{SSH_BENUTZER}@{SSH_HOST}'
+    ]
+
+    try:
+        print(f"Starte SSH-Tunnel auf localhost:{SSH_LOCAL_PORT} ...")
+        prozess = subprocess.Popen(
+            befehl,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        time.sleep(1)
+        if prozess.poll() is not None:
+            fehlertext = (prozess.stderr.read() or '').strip()
+            print(f"KRITISCHER FEHLER: SSH-Tunnel konnte nicht gestartet werden: {fehlertext}")
+            return None
+
+        print("SSH-Tunnel aktiv.")
+        return prozess
+    except FileNotFoundError:
+        print("KRITISCHER FEHLER: 'ssh' wurde nicht gefunden. Bitte OpenSSH installieren oder in PATH aufnehmen.")
+        return None
+    except Exception as e:
+        print(f"KRITISCHER FEHLER beim Start des SSH-Tunnels: {e}")
+        return None
+
+
+def stoppe_ssh_tunnel(prozess):
+    if not prozess:
+        return
+
+    try:
+        prozess.terminate()
+        prozess.wait(timeout=5)
+    except Exception:
+        try:
+            prozess.kill()
+        except Exception:
+            pass
+    print("SSH-Tunnel beendet.")
+
 def finde_und_speichere_abrechnungen():
     if not os.path.isdir(ORDNER_PFAD):
         print(f"KRITISCHER FEHLER: Basis-Ordner existiert nicht oder ist kein Verzeichnis: {ORDNER_PFAD}")
         return
 
-    fehlende_db_werte = [schluessel for schluessel, wert in DB_CONFIG.items() if not wert]
+    db_config = DB_CONFIG.copy()
+    ssh_tunnel_prozess = None
+
+    if SSH_TUNNEL_AKTIV:
+        ssh_tunnel_prozess = starte_ssh_tunnel()
+        if not ssh_tunnel_prozess:
+            return
+        db_config['host'] = 'localhost'
+        db_config['port'] = str(SSH_LOCAL_PORT)
+
+    fehlende_db_werte = [schluessel for schluessel, wert in db_config.items() if not wert]
     if fehlende_db_werte:
         print(f"KRITISCHER FEHLER: Fehlende DB-Konfiguration: {', '.join(fehlende_db_werte)}")
+        stoppe_ssh_tunnel(ssh_tunnel_prozess)
         return
 
     conn = None
     try:
         print("Verbinde mit PostgreSQL-Datenbank...")
-        conn = psycopg2.connect(**DB_CONFIG)
+        conn = psycopg2.connect(**db_config)
         print("Verbindung erfolgreich.")
     except Exception as e:
         print(f"KRITISCHER FEHLER: Konnte keine Verbindung zur Datenbank herstellen: {e}")
+        stoppe_ssh_tunnel(ssh_tunnel_prozess)
         return
 
     with conn:
@@ -174,6 +295,7 @@ def finde_und_speichere_abrechnungen():
                         conn.rollback()
     
     if conn: conn.close()
+    stoppe_ssh_tunnel(ssh_tunnel_prozess)
     print("\nScan-Vorgang abgeschlossen.")
 
 
