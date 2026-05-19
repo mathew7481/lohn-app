@@ -98,9 +98,7 @@ def lade_konfiguration():
 
     fehlend = [name for name, wert in pflichtfelder.items() if not wert]
     if fehlend:
-        raise ValueError(
-            "Fehlende .env-Konfiguration: " + ", ".join(fehlend)
-        )
+        raise ValueError("Fehlende .env-Konfiguration: " + ", ".join(fehlend))
 
     if config["ssh"]["use_tunnel"]:
         ssh_fehler = []
@@ -214,7 +212,10 @@ def _verbinde_db(config):
         tunnel = _erstelle_ssh_tunnel(config["ssh"])
         db_config["host"] = config["ssh"]["local_bind_host"]
         db_config["port"] = tunnel.local_bind_port
-        print(f"SSH-Tunnel aktiv: {db_config['host']}:{db_config['port']} -> {config['ssh']['remote_bind_host']}:{config['ssh']['remote_bind_port']}")
+        print(
+            f"SSH-Tunnel aktiv: {db_config['host']}:{db_config['port']} -> "
+            f"{config['ssh']['remote_bind_host']}:{config['ssh']['remote_bind_port']}"
+        )
 
     print("Verbinde mit PostgreSQL-Datenbank...")
     conn = psycopg2.connect(**db_config)

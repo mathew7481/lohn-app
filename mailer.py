@@ -1,11 +1,13 @@
 import smtplib
 import os
+
 import psycopg2
 from dotenv import load_dotenv
 from sshtunnel import SSHTunnelForwarder
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+
 
 def _as_bool(value, default=False):
     if value is None:
@@ -135,10 +137,10 @@ def _verbinde_db(config):
     print("Verbindung erfolgreich.")
     return conn, tunnel
 
+
 def lade_html_signatur(signatur_html_pfad):
-    """Lädt die HTML-Signatur aus einer Datei."""
     try:
-        with open(signatur_html_pfad, 'r', encoding='utf-8') as f:
+        with open(signatur_html_pfad, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         print(f"FEHLER: Die Signaturdatei {signatur_html_pfad} wurde nicht gefunden.")
@@ -149,7 +151,6 @@ def lade_html_signatur(signatur_html_pfad):
 
 
 def sende_neue_abrechnungen():
-    """Holt neue Abrechnungen aus der DB, versendet sie und aktualisiert den Status."""
     try:
         config = lade_konfiguration()
     except Exception as e:
@@ -181,7 +182,6 @@ def sende_neue_abrechnungen():
             a.status = 'neu';
     """
 
-    abrechnungen_zum_senden = []
     try:
         with conn.cursor() as cursor:
             cursor.execute(sql_query)
@@ -189,11 +189,15 @@ def sende_neue_abrechnungen():
     except Exception as e:
         print(f"FEHLER beim Abrufen der Abrechnungen: {e}")
         conn.close()
+        if tunnel:
+            tunnel.stop()
         return
 
     if not abrechnungen_zum_senden:
         print("Keine neuen Abrechnungen gefunden.")
         conn.close()
+        if tunnel:
+            tunnel.stop()
         return
 
     print(f"{len(abrechnungen_zum_senden)} neue Abrechnungen gefunden: Starte Versand...")
@@ -210,11 +214,10 @@ def sende_neue_abrechnungen():
 
             periode = f" für {monat} {jahr}" if monat and jahr else ""
 
-            # E-Mail erstellen
-            msg = MIMEMultipart('mixed')
-            msg['From'] = config["smtp"]["user"]
-            msg['To'] = email
-            msg['Subject'] = config["mail"]["betreff"].format(periode=periode)
+            msg = MIMEMultipart("mixed")
+            msg["From"] = config["smtp"]["user"]
+            msg["To"] = email
+            msg["Subject"] = config["mail"]["betreff"].format(periode=periode)
 
             html_body = f"""
             <html><body>
@@ -226,28 +229,26 @@ def sende_neue_abrechnungen():
             </body></html>
             """
 
-            msg.attach(MIMEText(config["mail"]["fallback"].format(name=voller_name, periode=periode), 'plain', 'utf-8'))
-            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+            msg.attach(MIMEText(config["mail"]["fallback"].format(name=voller_name, periode=periode), "plain", "utf-8"))
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-            # PDF-Anhang
-            anhang = MIMEApplication(pdf_inhalt, 'pdf')
-            anhang.add_header('Content-Disposition', 'attachment', filename=dateiname)
+            anhang = MIMEApplication(pdf_inhalt, "pdf")
+            anhang.add_header("Content-Disposition", "attachment", filename=dateiname)
             msg.attach(anhang)
 
             try:
                 server.send_message(msg)
                 print(f"✅ E-Mail an {email} wurde erfolgreich gesendet.")
-                neuer_status = 'gesendet'
+                neuer_status = "gesendet"
             except Exception as e:
                 print(f"❌ Fehler beim Senden an {email}: {e}")
-                neuer_status = 'fehler'
+                neuer_status = "fehler"
 
-            # Status in der DB aktualisieren
             try:
                 with conn.cursor() as cursor:
                     cursor.execute(
                         "UPDATE abrechnungen SET status = %s, gesendet_am = CURRENT_TIMESTAMP WHERE id = %s",
-                        (neuer_status, ab_id)
+                        (neuer_status, ab_id),
                     )
                 conn.commit()
                 print(f"Status in DB aktualisiert: {neuer_status}")
