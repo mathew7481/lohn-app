@@ -47,6 +47,7 @@ def lade_konfiguration():
                 "Hallo {name},\n\nim Anhang findest du deine Entgeltabrechnung{periode}.\n\n"
                 "Bei Fragen stehe ich dir gerne zur Verfügung.\n\nViele Grüße",
             ),
+            "lexoffice_email": os.getenv("LEXOFFICE_EMAIL"),
         },
         "db": {
             "dbname": os.getenv("DB_NAME"),
@@ -243,6 +244,24 @@ def sende_neue_abrechnungen():
             except Exception as e:
                 print(f"❌ Fehler beim Senden an {email}: {e}")
                 neuer_status = "fehler"
+
+            # Kopie an LexOffice senden (ohne Statusänderung)
+            lexoffice_email = config["mail"].get("lexoffice_email")
+            if lexoffice_email:
+                try:
+                    lexoffice_msg = MIMEMultipart("mixed")
+                    lexoffice_msg["From"] = config["smtp"]["user"]
+                    lexoffice_msg["To"] = lexoffice_email
+                    lexoffice_msg["Subject"] = f"Kopie: {config['mail']['betreff'].format(periode=periode)}"
+                    lexoffice_msg.attach(MIMEText(config["mail"]["fallback"].format(name=voller_name, periode=periode), "plain", "utf-8"))
+                    lexoffice_msg.attach(MIMEText(html_body, "html", "utf-8"))
+                    lexoffice_anhang = MIMEApplication(pdf_inhalt, "pdf")
+                    lexoffice_anhang.add_header("Content-Disposition", "attachment", filename=dateiname)
+                    lexoffice_msg.attach(lexoffice_anhang)
+                    server.send_message(lexoffice_msg)
+                    print(f"✅ Kopie an LexOffice ({lexoffice_email}) wurde erfolgreich gesendet.")
+                except Exception as e:
+                    print(f"❌ Fehler beim Senden der Kopie an LexOffice: {e}")
 
             try:
                 with conn.cursor() as cursor:
