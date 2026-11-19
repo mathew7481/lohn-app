@@ -3,7 +3,7 @@ import re
 import shutil
 
 import PyPDF2
-import psycopg2
+import psycopg
 from dotenv import load_dotenv
 from sshtunnel import SSHTunnelForwarder
 
@@ -218,7 +218,7 @@ def _verbinde_db(config):
         )
 
     print("Verbinde mit PostgreSQL-Datenbank...")
-    conn = psycopg2.connect(**db_config)
+    conn = psycopg.connect(**db_config)
     print("Verbindung erfolgreich.")
     return conn, tunnel
 
@@ -290,7 +290,7 @@ def finde_und_speichere_abrechnungen():
                                     (archivpfad, neue_id),
                                 )
 
-                        except psycopg2.IntegrityError:
+                        except psycopg.IntegrityError:
                             print(
                                 f"Info: Diese Abrechnung (ID {mitarbeiter_id}, {monat} {jahr}) existiert bereits in der DB. Archiviere trotzdem."
                             )
@@ -312,13 +312,13 @@ def finde_und_speichere_abrechnungen():
 if __name__ == "__main__":
     try:
         import PyPDF2  # noqa: F401
-        import psycopg2  # noqa: F401
+        import psycopg  # noqa: F401
         from dotenv import load_dotenv  # noqa: F401
         from sshtunnel import SSHTunnelForwarder  # noqa: F401
     except ImportError as e:
         modul_name = str(e).split("'")[1]
         print(f"Fehler: Das Modul '{modul_name}' ist nicht installiert.")
-        print("Bitte installieren: pip install pypdf2 psycopg2-binary python-dotenv sshtunnel")
+        print("Bitte installieren: pip install -r requirements.txt")
         raise SystemExit(1)
 
     finde_und_speichere_abrechnungen()

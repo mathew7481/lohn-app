@@ -1,7 +1,7 @@
 import smtplib
 import os
 
-import psycopg2
+import psycopg
 from dotenv import load_dotenv
 from sshtunnel import SSHTunnelForwarder
 from email.mime.multipart import MIMEMultipart
@@ -134,7 +134,7 @@ def _verbinde_db(config):
         )
 
     print("Verbinde mit PostgreSQL-Datenbank...")
-    conn = psycopg2.connect(**db_config)
+    conn = psycopg.connect(**db_config)
     print("Verbindung erfolgreich.")
     return conn, tunnel
 

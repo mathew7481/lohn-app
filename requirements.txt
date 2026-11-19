@@ -1,5 +1,5 @@
 PyPDF2
-psycopg2-binary
+psycopg[binary]>=3.2,<4
 python-dotenv
 sshtunnel
 paramiko<4

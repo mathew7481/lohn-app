@@ -10,8 +10,10 @@ Dieses Projekt scannt Lohnabrechnungen als PDF, prüft Inhalt und Dateinamensmus
 Pakete installieren:
 
 ```bash
-pip install pypdf2 psycopg2-binary python-dotenv sshtunnel
+pip install -r requirements.txt
 ```
+
+`psycopg[binary]` verwendet Psycopg 3 und stellt auch für aktuelle Python-Versionen wie Python 3.14 fertige Windows-Wheels bereit; eine lokale PostgreSQL-Entwicklungsumgebung mit `pg_config` ist dafür nicht erforderlich.
 
 ## Konfiguration über `.env`
 
